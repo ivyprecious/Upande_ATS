@@ -1,0 +1,163 @@
+{
+ "actions": [],
+ "creation": "2026-06-09 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "auto_score_on_resume_upload",
+  "default_passmark",
+  "column_break_general",
+  "score_visibility_role",
+  "keep_score_history",
+  "engines_section",
+  "engine_weights",
+  "mandatory_section",
+  "mandatory_keyword_rule",
+  "mandatory_cap",
+  "column_break_mandatory",
+  "fuzzy_match_threshold",
+  "synonyms_section",
+  "synonym_groups",
+  "files_section",
+  "accepted_file_types",
+  "min_resume_chars"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_score_on_resume_upload",
+   "fieldtype": "Check",
+   "label": "Auto-score on resume upload"
+  },
+  {
+   "default": "60",
+   "fieldname": "default_passmark",
+   "fieldtype": "Percent",
+   "label": "Default Passmark %"
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "HR User",
+   "fieldname": "score_visibility_role",
+   "fieldtype": "Link",
+   "label": "Score Visible To Role",
+   "options": "Role"
+  },
+  {
+   "default": "1",
+   "description": "If on, every scoring run creates a new ATS Score row. If off, latest score supersedes the previous one.",
+   "fieldname": "keep_score_history",
+   "fieldtype": "Check",
+   "label": "Keep Score History"
+  },
+  {
+   "fieldname": "engines_section",
+   "fieldtype": "Section Break",
+   "label": "Scoring Engines"
+  },
+  {
+   "description": "Weights of enabled engines must sum to 100.",
+   "fieldname": "engine_weights",
+   "fieldtype": "Table",
+   "label": "Engine Weights",
+   "options": "ATS Engine Weight"
+  },
+  {
+   "fieldname": "mandatory_section",
+   "fieldtype": "Section Break",
+   "label": "Mandatory Keyword Behavior"
+  },
+  {
+   "default": "Cap Score",
+   "fieldname": "mandatory_keyword_rule",
+   "fieldtype": "Select",
+   "label": "Mandatory Rule",
+   "options": "Cap Score\nZero Score\nWarn Only"
+  },
+  {
+   "default": "40",
+   "depends_on": "eval:doc.mandatory_keyword_rule=='Cap Score'",
+   "fieldname": "mandatory_cap",
+   "fieldtype": "Percent",
+   "label": "Cap Value %"
+  },
+  {
+   "fieldname": "column_break_mandatory",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "85",
+   "description": "rapidfuzz partial_ratio threshold (0-100). Higher = stricter.",
+   "fieldname": "fuzzy_match_threshold",
+   "fieldtype": "Int",
+   "label": "Fuzzy Match Threshold"
+  },
+  {
+   "fieldname": "synonyms_section",
+   "fieldtype": "Section Break",
+   "label": "Synonyms"
+  },
+  {
+   "fieldname": "synonym_groups",
+   "fieldtype": "Table",
+   "label": "Synonym Groups",
+   "options": "ATS Synonym Group"
+  },
+  {
+   "fieldname": "files_section",
+   "fieldtype": "Section Break",
+   "label": "File Handling"
+  },
+  {
+   "default": "pdf,docx,doc,txt",
+   "fieldname": "accepted_file_types",
+   "fieldtype": "Small Text",
+   "label": "Accepted File Types"
+  },
+  {
+   "default": "200",
+   "description": "CVs with fewer than this many extracted characters are treated as unparseable.",
+   "fieldname": "min_resume_chars",
+   "fieldtype": "Int",
+   "label": "Min Resume Characters"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande ATS",
+ "name": "ATS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "HR Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

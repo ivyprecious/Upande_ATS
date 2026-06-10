@@ -1,0 +1,49 @@
+{
+ "actions": [],
+ "creation": "2026-06-09 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "canonical_term",
+  "synonyms",
+  "is_active"
+ ],
+ "fields": [
+  {
+   "fieldname": "canonical_term",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Canonical Term",
+   "reqd": 1
+  },
+  {
+   "description": "Comma-separated synonyms (e.g. js, ecmascript, node.js)",
+   "fieldname": "synonyms",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Synonyms",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande ATS",
+ "name": "ATS Synonym Group",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
