@@ -33,9 +33,10 @@ _MONTH = (
 # A single point in time the parser understands.
 _DATE_POINT = (
 	r"(?:"
-	r"" + _MONTH + r"\.?\s*,?\s*\d{4}"   # mon yyyy / month, yyyy
-	r"|\d{1,2}\s*[/\-]\s*\d{4}"           # mm/yyyy or mm-yyyy
-	r"|\d{4}"                              # bare year
+	r"" + _MONTH + r"\.?\s*,?\s*\d{4}"           # mon yyyy / month, yyyy
+	r"|\d{4}\s*[,\-/ ]?\s*" + _MONTH +            # yyyy mon (year-first, e.g. "2023 mar")
+	r"|\d{1,2}\s*[/\-]\s*\d{4}"                   # mm/yyyy or mm-yyyy
+	r"|\d{4}"                                      # bare year
 	r")"
 )
 
@@ -95,6 +96,14 @@ def _parse_point(token: str):
 	if re.fullmatch(r"\d{4}", token):
 		year = int(token)
 		return (year, 1) if _plausible_year(year) else None
+
+	# year-first: yyyy <month>  (e.g. "2023 mar", "2005, june", "2021-may")
+	m = re.match(r"(\d{4})\s*[,\-/ ]?\s*([a-z]+)", token, flags=re.IGNORECASE)
+	if m:
+		year = int(m.group(1))
+		mon = _MONTH_NUM.get(m.group(2).lower()[:4]) or _MONTH_NUM.get(m.group(2).lower()[:3])
+		if mon and _plausible_year(year):
+			return year, mon
 
 	# month-name year
 	m = re.match(r"([a-z]+)\.?\s*,?\s*(\d{4})", token, flags=re.IGNORECASE)
