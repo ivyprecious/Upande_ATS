@@ -211,7 +211,9 @@ function experience_section_html(doc) {
 				const months = r.months != null ? `${r.months} months` : "";
 				const tag = r.relevant
 					? "<span class='indicator-pill green'>Counted</span>"
-					: "<span class='indicator-pill gray'>Not relevant</span>";
+					: r.kind === "education"
+						? "<span class='indicator-pill gray'>Education — not counted</span>"
+						: "<span class='indicator-pill gray'>Not relevant</span>";
 				return `<li>${frappe.utils.escape_html(r.role_context || "(role)")} — ${months} — ${tag}</li>`;
 			})
 			.join("");
