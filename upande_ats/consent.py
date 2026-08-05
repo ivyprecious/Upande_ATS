@@ -10,11 +10,12 @@
 # alert is a Notification document, never code.
 
 import json
+import re
 
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-from frappe.utils import get_url, now_datetime
+from frappe.utils import escape_html, get_url, now_datetime
 
 CONSENT_PAGE = "referee-consent"
 
@@ -89,20 +90,28 @@ def _get_consent_template():
 	return frappe.db.get_single_value("ATS Settings", "consent_statement") or ""
 
 
-# Seeded once into ATS Settings; fully editable in the UI thereafter.
-DEFAULT_CONSENT_STATEMENT = (
-	"<p>I confirm that the referee details I have provided are accurate and that I "
-	"have informed each referee that they may be contacted.</p>"
-	"<p>I consent to Upande contacting these referees and to a reference and "
-	"background check being carried out as part of my application. I understand this "
-	"information will be handled confidentially and used only for recruitment purposes.</p>"
-)
+# Seeded once into ATS Settings; fully editable in the UI thereafter. The company
+# name is resolved from the site's default Company at seed time so a fresh site gets
+# its own legal entity instead of inheriting a hardcoded one; with no default Company
+# set the wording stays company-neutral. Each site sets its real legal name in the UI.
+def _default_consent_statement():
+	company = frappe.db.get_default("Company")
+	who = escape_html(company) if company else "the hiring organisation"
+	return (
+		"<p>I confirm that the referee details I have provided are accurate and that I "
+		"have informed each referee that they may be contacted.</p>"
+		f"<p>I consent to {who} contacting these referees and to a reference and "
+		"background check being carried out as part of my application. I understand this "
+		"information will be handled confidentially and used only for recruitment purposes.</p>"
+	)
 
 
 def ensure_default_statement():
 	"""Seed the consent wording if ATS Settings has none yet (idempotent)."""
 	if not frappe.db.get_single_value("ATS Settings", "consent_statement"):
-		frappe.db.set_single_value("ATS Settings", "consent_statement", DEFAULT_CONSENT_STATEMENT)
+		frappe.db.set_single_value(
+			"ATS Settings", "consent_statement", _default_consent_statement()
+		)
 
 
 def _consent_link(token):
@@ -220,24 +229,39 @@ def submit_referee_consent(token, referees, signed_by_name, signature, consent_g
 	if not signature:
 		frappe.throw(_("Please sign in the signature box."))
 
-	# Keep only rows that actually name a referee.
-	clean = [r for r in (referees or []) if (r.get("referee_name") or "").strip()]
-	if not clean:
-		frappe.throw(_("Please add at least one referee."))
+	# Every referee row must be complete, and at least two referees are required.
+	# Mirrors the client-side checks so a hand-crafted POST can't slip a partial
+	# or single referee through.
+	referees = referees or []
+	referee_fields = [
+		("referee_name", _("Name")),
+		("relationship", _("Relationship")),
+		("organisation", _("Organisation")),
+		("position", _("Position")),
+		("phone", _("Phone")),
+		("email", _("Email")),
+	]
+	if len(referees) < 2:
+		frappe.throw(_("Please provide at least two referees."))
+
+	clean = []
+	for idx, r in enumerate(referees, start=1):
+		row = {field: (r.get(field) or "").strip() for field, _label in referee_fields}
+		for field, label in referee_fields:
+			if not row[field]:
+				frappe.throw(_("Referee {0}: please fill in {1}.").format(idx, label))
+		# Contact details are the whole point of the form, so the format is
+		# checked here too — the browser prefix/pattern can be bypassed.
+		row["phone"] = _normalize_phone(row["phone"])
+		if not row["phone"] or not frappe.utils.validate_email_address(row["email"], throw=False):
+			frappe.throw(
+				_("Referee {0}: enter a valid email and a phone in the form +254 7XXXXXXXX").format(idx)
+			)
+		clean.append(row)
 
 	consent.set("referees", [])
 	for r in clean:
-		consent.append(
-			"referees",
-			{
-				"referee_name": (r.get("referee_name") or "").strip(),
-				"relationship": (r.get("relationship") or "").strip(),
-				"organisation": (r.get("organisation") or "").strip(),
-				"position": (r.get("position") or "").strip(),
-				"phone": (r.get("phone") or "").strip(),
-				"email": (r.get("email") or "").strip(),
-			},
-		)
+		consent.append("referees", r)
 
 	consent.signed_by_name = signed_by_name
 	consent.signature = signature
@@ -249,6 +273,28 @@ def submit_referee_consent(token, referees, signed_by_name, signature, consent_g
 
 	frappe.db.commit()
 	return {"state": "submitted"}
+
+
+# Kenyan mobile numbers in international form: +254 then a 9-digit national
+# number starting 7 (Safaricom) or 1 (Airtel/Telkom).
+PHONE_RE = re.compile(r"^\+254[17]\d{8}$")
+
+
+def _normalize_phone(value: str) -> str:
+	"""Return the number as +254XXXXXXXXX, or "" if it isn't a valid one.
+
+	The form posts the 9 national digits behind a fixed +254 prefix, but a
+	pasted or hand-crafted value may arrive as 0712…, 254712… or +254 712 …,
+	so those are reduced to the same 9 digits before checking.
+	"""
+	digits = re.sub(r"[\s\-()]", "", value or "")
+	digits = digits.removeprefix("+")
+	if digits.startswith("254"):
+		digits = digits[3:]
+	elif digits.startswith("0"):
+		digits = digits[1:]
+	candidate = f"+254{digits}"
+	return candidate if PHONE_RE.match(candidate) else ""
 
 
 def _get_consent_by_token(token):

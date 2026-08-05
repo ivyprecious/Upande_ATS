@@ -22,6 +22,15 @@
 		width: 100%; box-sizing: border-box; border: 1px solid #e0e3e6;
 		border-radius: 6px; padding: 8px;
 	}
+	/* Phone cell: a fixed "+254" addon the referee cannot edit, followed by the
+	   9 national digits they type. Keeps junk like "67556+647-" out entirely. */
+	.rc-phone { display: flex; align-items: stretch; }
+	.rc-phone .rc-prefix {
+		display: flex; align-items: center; padding: 8px; font-size: 14px;
+		border: 1px solid #e0e3e6; border-right: 0; border-radius: 6px 0 0 6px;
+		background: #f4f5f6; color: #495057; user-select: none; white-space: nowrap;
+	}
+	table.rc-ref .rc-phone input { border-radius: 0 6px 6px 0; min-width: 96px; }
 	.rc-refrow-actions { text-align: right; margin-top: 8px; }
 	.rc-link-btn {
 		background: none; border: 0; color: #2490ef; cursor: pointer;
@@ -51,6 +60,7 @@
 	.rc-state h2 { margin: 12px 0 6px; }
 	.rc-state p { color: #6c757d; }
 	.rc-progress { font-size: 13px; color: #6c757d; margin-top: 6px; }
+	.rc-progress.rc-error { color: #b50000; font-weight: 700; font-size: 1.15rem; margin-top: 8px; }
 </style>
 {% endblock %}
 
@@ -76,8 +86,8 @@
 			<table class="rc-ref">
 				<thead>
 					<tr>
-						<th>Name*</th><th>Relationship</th><th>Organisation</th>
-						<th>Position</th><th>Phone</th><th>Email</th><th></th>
+						<th>Name*</th><th>Relationship*</th><th>Organisation*</th>
+						<th>Position*</th><th>Phone*</th><th>Email*</th><th></th>
 					</tr>
 				</thead>
 				<tbody id="rc-ref-body"></tbody>
@@ -156,6 +166,29 @@
 	// ----- Referees table (start with two rows minimum) -----
 	var body = document.getElementById("rc-ref-body");
 	var COLS = ["referee_name", "relationship", "organisation", "position", "phone", "email"];
+	var COL_LABELS = {
+		referee_name: "Name",
+		relationship: "Relationship",
+		organisation: "Organisation",
+		position: "Position",
+		phone: "Phone",
+		email: "Email",
+	};
+
+	// Phone is stored as +254 + 9 national digits; the referee only ever types
+	// the 9 digits. PHONE_RE mirrors the server check in consent.py.
+	var PHONE_PREFIX = "+254";
+	var PHONE_RE = /^\+254[17]\d{8}$/;
+	var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	// A stored/pre-filled number may arrive as +254712…, 254712… or 0712…;
+	// show just the 9 national digits in the input.
+	function nationalDigits(value) {
+		var d = String(value || "").replace(/[\s\-()+]/g, "");
+		if (d.indexOf("254") === 0) d = d.slice(3);
+		else if (d.indexOf("0") === 0) d = d.slice(1);
+		return d.slice(0, 9);
+	}
 
 	function addRow(data) {
 		data = data || {};
@@ -163,10 +196,41 @@
 		COLS.forEach(function (c) {
 			var td = document.createElement("td");
 			var inp = document.createElement("input");
-			inp.type = "text";
 			inp.setAttribute("data-col", c);
-			inp.value = data[c] || "";
-			td.appendChild(inp);
+			inp.required = true;
+
+			if (c === "phone") {
+				// Static addon + numeric-only input: the +254 cannot be edited away.
+				var group = document.createElement("div");
+				group.className = "rc-phone";
+				var prefix = document.createElement("span");
+				prefix.className = "rc-prefix";
+				prefix.textContent = PHONE_PREFIX;
+				inp.type = "tel";
+				inp.inputMode = "numeric";
+				inp.maxLength = 9;
+				inp.pattern = "[17][0-9]{8}";
+				inp.placeholder = "7XXXXXXXX";
+				inp.title = "9 digits starting with 7 or 1, e.g. 712345678";
+				inp.value = nationalDigits(data[c]);
+				// Strip anything that isn't a digit as it is typed or pasted.
+				inp.addEventListener("input", function () {
+					var cleaned = inp.value.replace(/\D/g, "").slice(0, 9);
+					if (cleaned !== inp.value) inp.value = cleaned;
+				});
+				group.appendChild(prefix);
+				group.appendChild(inp);
+				td.appendChild(group);
+			} else if (c === "email") {
+				inp.type = "email";
+				inp.placeholder = "name@example.com";
+				inp.value = data[c] || "";
+				td.appendChild(inp);
+			} else {
+				inp.type = "text";
+				inp.value = data[c] || "";
+				td.appendChild(inp);
+			}
 			tr.appendChild(td);
 		});
 		var tdAct = document.createElement("td");
@@ -191,13 +255,17 @@
 	document.getElementById("rc-add-ref").addEventListener("click", function () { addRow(); });
 
 	function collectReferees() {
+		// Return every row present; completeness is validated on submit.
+		// Phone is submitted in full international form, prefix included.
 		var rows = [];
 		body.querySelectorAll("tr").forEach(function (tr) {
 			var r = {};
 			tr.querySelectorAll("input").forEach(function (inp) {
-				r[inp.getAttribute("data-col")] = inp.value.trim();
+				var col = inp.getAttribute("data-col");
+				var value = inp.value.trim();
+				r[col] = col === "phone" && value ? PHONE_PREFIX + value : value;
 			});
-			if (r.referee_name) rows.push(r);
+			rows.push(r);
 		});
 		return rows;
 	}
@@ -252,6 +320,12 @@
 	var progress = document.getElementById("rc-progress");
 	var submitting = false;
 
+	// Prominent, unmissable error styling for validation failures; showStatus is
+	// the neutral state (e.g. "Submitting..."). progress starts empty so nothing
+	// is shown until there is something to say.
+	function showError(msg) { progress.textContent = msg; progress.classList.add("rc-error"); }
+	function showStatus(msg) { progress.textContent = msg; progress.classList.remove("rc-error"); }
+
 	form.addEventListener("submit", function (e) {
 		e.preventDefault();
 		if (submitting) return;
@@ -260,14 +334,33 @@
 		var consent = document.getElementById("rc-consent").checked;
 		var name = document.getElementById("rc-name").value.trim();
 
-		if (referees.length < 2) { progress.textContent = "Please provide at least two referees."; return; }
-		if (!consent) { progress.textContent = "Please tick the consent box."; return; }
-		if (!name) { progress.textContent = "Please type your full name."; return; }
-		if (!dirty) { progress.textContent = "Please sign in the signature box."; return; }
+		if (referees.length < 2) { showError("Please provide at least two referees."); return; }
+		for (var i = 0; i < referees.length; i++) {
+			for (var c = 0; c < COLS.length; c++) {
+				if (!referees[i][COLS[c]]) {
+					showError("Referee " + (i + 1) + ": please fill in " + COL_LABELS[COLS[c]] + ".");
+					return;
+				}
+			}
+			if (!PHONE_RE.test(referees[i].phone)) {
+				showError(
+					"Referee " + (i + 1) + ": enter a 9-digit phone number starting with 7 or 1, " +
+					"e.g. 712345678."
+				);
+				return;
+			}
+			if (!EMAIL_RE.test(referees[i].email)) {
+				showError("Referee " + (i + 1) + ": enter a valid email address, e.g. name@example.com.");
+				return;
+			}
+		}
+		if (!consent) { showError("Please tick the consent box."); return; }
+		if (!name) { showError("Please type your full name."); return; }
+		if (!dirty) { showError("Please sign in the signature box."); return; }
 
 		submitting = true;
 		submitBtn.disabled = true;
-		progress.textContent = "Submitting...";
+		showStatus("Submitting...");
 
 		fetch("/api/method/upande_ats.consent.submit_referee_consent", {
 			method: "POST",
@@ -285,13 +378,13 @@
 				if (res.ok && res.body.message && res.body.message.state === "submitted") {
 					renderDone();
 				} else {
-					progress.textContent = "Could not submit. Please try again.";
+					showError("Could not submit. Please try again.");
 					submitBtn.disabled = false;
 					submitting = false;
 				}
 			})
 			.catch(function () {
-				progress.textContent = "Network error. Please try again.";
+				showError("Network error. Please try again.");
 				submitBtn.disabled = false;
 				submitting = false;
 			});
