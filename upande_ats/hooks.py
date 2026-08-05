@@ -29,5 +29,17 @@ doctype_list_js = {
 }
 
 fixtures = [
-	{"dt": "Custom Field", "filters": [["dt", "in", ["Job Opening", "Job Applicant", "Designation"]], ["fieldname", "like", "ats_%"]]},
+	# One Custom Field entry only: every entry for the same doctype writes to the
+	# same fixtures/custom_field.json, so a second block would overwrite this one
+	# on export. custom_notice_period is the public job-application form's only
+	# non-standard field, so it rides along via or_filters.
+	{
+		"dt": "Custom Field",
+		"filters": [["dt", "in", ["Job Opening", "Job Applicant", "Designation"]]],
+		"or_filters": [["fieldname", "like", "ats_%"], ["fieldname", "=", "custom_notice_period"]],
+	},
+	# The public application form. Fixtured, so the commit is the source of truth:
+	# every deploy re-imports it and overwrites edits made in Desk. Re-export
+	# (bench export-fixtures) and commit after any UI change to this form.
+	{"dt": "Web Form", "filters": [["name", "=", "kentrout-job-application"]]},
 ]
