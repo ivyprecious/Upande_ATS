@@ -17,6 +17,10 @@ doc_events = {
 		# Resume changed on an existing applicant -> re-score and re-evaluate the verdict.
 		"on_update": "upande_ats.events.maybe_screen_on_update",
 	},
+	"Employee": {
+		# Next of Kin benefit allocation must total 100% or less.
+		"validate": "upande_ats.employee.validate_next_of_kin_allocation",
+	},
 }
 
 doctype_js = {
